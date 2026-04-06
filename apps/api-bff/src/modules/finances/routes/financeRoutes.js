@@ -51,16 +51,16 @@ router.get('/payment-methods', authenticateToken, financeController.getValidPaym
 // ===========================================
 
 // GET /finances/working-capital - Get complete working capital report
-router.get('/working-capital',authorizeRoles('admin'), authenticateToken, financeController.getWorkingCapital);
+router.get('/working-capital', authenticateToken, financeController.getWorkingCapital);
 
 // GET /finances/inventory-value - Get inventory value
-router.get('/inventory-value',authorizeRoles('admin'), authenticateToken, financeController.getInventoryValue);
+router.get('/inventory-value', authenticateToken, financeController.getInventoryValue);
 
 // GET /finances/waste-value - Get waste value for period
-router.get('/waste-value',authorizeRoles('admin'), authenticateToken, financeController.getWasteValue);
+router.get('/waste-value', authenticateToken, financeController.getWasteValue);
 
 // GET /finances/cash-in-boxes - Get cash in boxes for period
-router.get('/cash-in-boxes', authenticateToken,authorizeRoles('admin'), financeController.getCashInBoxes);
+router.get('/cash-in-boxes', authenticateToken, financeController.getCashInBoxes);
 
 // GET /finances/capital-config - Get capital configuration (admin only)
 router.get('/capital-config', authenticateToken, authorizeRoles('admin'), financeController.getCapitalConfig);
