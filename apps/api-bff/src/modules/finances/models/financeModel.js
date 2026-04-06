@@ -374,8 +374,9 @@ class FinanceModel {
       this.getTotalExpenses(filters)
     ]);
 
+    const initialCapital = config.workingCapital.initialCapital;
     const netInventory = inventoryValue - wasteValue;
-    const workingCapital = netInventory + cashInBoxes - totalExpenses;
+    const workingCapital = initialCapital + netInventory + cashInBoxes - totalExpenses;
 
     let status = 'critical';
     let statusLabel = 'Crítico';
@@ -404,6 +405,7 @@ class FinanceModel {
         end_date: filters.end_date || null
       },
       components: {
+        initial_capital: initialCapital,
         inventory_gross: inventoryValue,
         waste_deductions: wasteValue,
         inventory_net: netInventory,
