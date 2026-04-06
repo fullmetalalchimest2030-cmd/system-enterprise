@@ -55,6 +55,13 @@ module.exports = {
   },
   
   /**
+   * Working capital configuration
+   */
+  workingCapital: {
+    initialCapital: parseFloat(process.env.INITIAL_WORKING_CAPITAL) || 0,
+  },
+  
+  /**
    * Analytics Service configuration
    */
   analytics: {

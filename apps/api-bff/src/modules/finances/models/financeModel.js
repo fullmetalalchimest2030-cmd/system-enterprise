@@ -6,6 +6,7 @@
 
 const db = require('../../../config/database');
 const { roundToTenCents } = require('../../../shared/utils/currencyUtils');
+const config = require('../../../config');
 
 const VALID_CATEGORIES = ['flowers', 'services', 'transport', 'salaries', 'utilities', 'supplies', 'other'];
 
@@ -421,7 +422,7 @@ class FinanceModel {
    * @returns {Promise<Object>} Capital configuration
    */
   async getCapitalConfig() {
-    const initialCapital = parseFloat(process.env.INITIAL_WORKING_CAPITAL) || 0;
+    const initialCapital = config.workingCapital.initialCapital;
     
     return {
       initial_capital: initialCapital,
