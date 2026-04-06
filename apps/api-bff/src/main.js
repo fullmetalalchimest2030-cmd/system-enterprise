@@ -59,26 +59,27 @@ const catalogRoutes = require('./modules/catalog/catalogRoutes');
 function createApp() {
   const app = express();
 
+  // 1. AÑADE ESTA LÍNEA JUSTO AQUÍ (Vital para Render/Proxies)
+  app.set('trust proxy', 1); 
+
   // Security middleware
   app.use(helmet());
   app.use(cors(config.cors));
 
-  // Rate limiting middleware
-  // General API rate limiter
+  // 2. MODIFICA LOS LIMITADORES
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // límite de 100 requests por ventana
-    message: 'Demasiadas peticiones desde esta IP, por favor intente más tarde',
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    windowMs: 15 * 60 * 1000, 
+    max: 500, // Súbelo un poco para pruebas (estaba en 100)
+    message: 'Demasiadas peticiones, intenta más tarde',
+    standardHeaders: true,
+    legacyHeaders: false,
   });
 
-  // Strict rate limiter for authentication endpoints
   const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 5, // límite de 5 intentos de login
-    message: 'Demasiados intentos de autenticación, por favor intente más tarde',
-    skipSuccessfulRequests: true, // No contar requests exitosos
+    windowMs: 15 * 60 * 1000, 
+    max: 20, // Súbelo a 20 mientras haces pruebas de integración
+    message: 'Demasiados intentos de login, intenta en 15 minutos',
+    skipSuccessfulRequests: true,
   });
 
   // Body parsing middleware
