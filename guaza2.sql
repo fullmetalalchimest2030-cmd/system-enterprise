@@ -86,6 +86,9 @@ CREATE TABLE products (
     sell_price numeric(14,2) NOT NULL,
     stock_cached numeric(14,4) DEFAULT 0,
     min_stock numeric(14,4) DEFAULT 0,
+    description character varying(500),
+    image_url character varying(500),
+    show_in_catalog boolean NOT NULL DEFAULT false,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp with time zone,
@@ -196,7 +199,10 @@ CREATE TABLE recipes (
     total_cost numeric(10,2),
     preparation_time integer,
     is_active boolean DEFAULT true,
+    image_url character varying(500),
+    show_in_catalog boolean NOT NULL DEFAULT false,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone,
     deleted_at timestamp with time zone
 );
 
@@ -377,25 +383,8 @@ INSERT INTO stock_movement_types (code) VALUES
     ('adjustment'),
     ('consumption');
 
--- =============================================
--- NOTA SOBRE USUARIO POSTGRES
--- =============================================
+CREATE USER floreria_db WITH PASSWORD 'contraseñadelasGOD';
+GRANT ALL PRIVILEGES ON DATABASE floreria TO floreria_db;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO floreria_db;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO floreria_db;
 
--- El script usa el usuario 'postgres' por defecto. 
--- Si necesitas un usuario separado, ejecuta:
--- CREATE USER floreria_user WITH PASSWORD 'tu_password';
--- GRANT ALL PRIVILEGES ON DATABASE floreria TO floreria_user;
--- GRANT ALL ON ALL TABLES IN SCHEMA public TO floreria_user;
--- GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO floreria_user;
-
--- =============================================
--- FIN DEL SCRIPT
--- =============================================
-
-cambios extra:
-
-ALTER TABLE products
-  ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
-
-ALTER TABLE recipes
-  ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);

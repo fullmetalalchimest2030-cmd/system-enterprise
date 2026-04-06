@@ -12,16 +12,27 @@ module.exports = {
   /**
    * Database configuration
    */
-  database: {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'floreria',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    max: parseInt(process.env.DB_POOL_SIZE || '20'),
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
-    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000'),
-  },
+  database: process.env.DATABASE_URL 
+    ? {
+        // SI HAY DATABASE_URL (Caso Neon/Render)
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false },
+        max: parseInt(process.env.DB_POOL_SIZE || '5'),
+        idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
+        connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '10000'), // Más tiempo para despertar a Neon
+      }
+    : {
+        // SI NO HAY DATABASE_URL (Caso Local)
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME || 'floreria',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+        max: parseInt(process.env.DB_POOL_SIZE || '20'),
+        idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
+        connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000'),
+        ssl: false
+      },
   
   /**
    * JWT configuration
