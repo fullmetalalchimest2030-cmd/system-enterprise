@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sales Model
  * @module modules/sales/models/salesModel
  * Based on baseDatos.txt schema
@@ -267,13 +267,13 @@ class SalesModel {
     let paramCount = 1;
 
     if (filters.start_date) {
-      dateFilter += ` AND created_at >= $${paramCount}`;
+      dateFilter += ` AND s.created_at >= $${paramCount}`;
       params.push(filters.start_date);
       paramCount++;
     }
 
     if (filters.end_date) {
-      dateFilter += ` AND created_at <= $${paramCount}`;
+      dateFilter += ` AND s.created_at <= $${paramCount}`;
       params.push(filters.end_date);
       paramCount++;
     }
@@ -284,17 +284,17 @@ class SalesModel {
         COUNT(*) as total_sales,
         COALESCE(SUM(total_amount), 0) as total_amount,
         COALESCE(AVG(total_amount), 0) as average_sale
-      FROM sales 
-      WHERE status = 'completed'${dateFilter}
+      FROM sales s
+      WHERE s.status = 'completed'${dateFilter}
     `, params);
 
-    // Sales by payment method
+    // Sales by payment method (apply same date filter)
     const paymentResult = await db.query(`
       SELECT p.code as payment_method, COUNT(*) as count, COALESCE(SUM(pay.amount), 0) as total
       FROM payments pay
       JOIN payment_methods p ON pay.payment_method_id = p.id
       JOIN sales s ON pay.sale_id = s.id
-      WHERE s.status = 'completed'
+      WHERE s.status = 'completed'${dateFilter}
       GROUP BY p.code
     `, params);
 
@@ -435,10 +435,24 @@ class SalesModel {
 
       // Create payment record
       if (payment_method_id) {
-        await client.query(`
+        const paymentResult = await client.query(`
           INSERT INTO payments (sale_id, cashbox_id, payment_method_id, amount, created_at)
           VALUES ($1, $2, $3, $4, NOW())
+          RETURNING id
         `, [sale.id, cashbox_id, payment_method_id, total_amount]);
+
+        // Register cash flow entry so the cashbox tracks this income
+        if (cashbox_id && paymentResult.rows[0]) {
+          const flowTypeResult = await client.query(
+            `SELECT id FROM cash_flow_types WHERE code = 'sale_income' LIMIT 1`
+          );
+          if (flowTypeResult.rows[0]) {
+            await client.query(`
+              INSERT INTO cash_flow (cashbox_id, flow_type_id, reference_table, reference_id, amount, created_at)
+              VALUES ($1, $2, 'payments', $3, $4, NOW())
+            `, [cashbox_id, flowTypeResult.rows[0].id, paymentResult.rows[0].id, total_amount]);
+          }
+        }
       }
 
       await client.query('COMMIT');
