@@ -243,6 +243,19 @@ class SalesModel {
         }
       }
 
+      // 4. Reverse cash_flow entries for this sale's payments
+      // Find all payments for this sale and delete their cash_flow records
+      const paymentsResult = await client.query(
+        `SELECT id FROM payments WHERE sale_id = $1`,
+        [saleId]
+      );
+      for (const payment of paymentsResult.rows) {
+        await client.query(
+          `DELETE FROM cash_flow WHERE reference_table = 'payments' AND reference_id = $1`,
+          [payment.id]
+        );
+      }
+
       await client.query('COMMIT');
       return updatedSaleResult.rows[0];
 

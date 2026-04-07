@@ -11,11 +11,6 @@ const config = require('../../../config');
 const VALID_CATEGORIES = ['flowers', 'services', 'transport', 'salaries', 'utilities', 'supplies', 'other'];
 
 class FinanceModel {
-  /**
-   * Get all expenses
-   * @param {Object} filters - Filter options
-   * @returns {Promise<Array>} Expenses array
-   */
   async findAll(filters = {}) {
     let query = `
       SELECT e.*, 
@@ -50,13 +45,11 @@ class FinanceModel {
     }
 
     if (filters.start_date && filters.end_date) {
-      // start_date: usar > con el día siguiente para ser inclusivo
       query += ` AND e.created_at > $${paramCount}`;
       const startDateObj = this.parseDate(filters.start_date);
       startDateObj.setDate(startDateObj.getDate() + 1);
       params.push(startDateObj.toISOString().split('T')[0]);
       paramCount++;
-      // end_date: usar < con el día siguiente para incluir todo el día final
       query += ` AND e.created_at < $${paramCount}`;
       const endDateObj = this.parseDate(filters.end_date);
       endDateObj.setDate(endDateObj.getDate() + 1);
@@ -67,7 +60,6 @@ class FinanceModel {
       params.push(filters.start_date);
       paramCount++;
     } else if (filters.end_date) {
-      // Si solo hay end_date, usar < con el día siguiente
       query += ` AND e.created_at < $${paramCount}`;
       const endDateObj = this.parseDate(filters.end_date);
       endDateObj.setDate(endDateObj.getDate() + 1);
@@ -81,11 +73,6 @@ class FinanceModel {
     return result.rows;
   }
 
-  /**
-   * Get expense by ID
-   * @param {number} id - Expense ID
-   * @returns {Promise<Object>} Expense object
-   */
   async findById(id) {
     const result = await db.query(`
       SELECT e.*, 
@@ -98,33 +85,48 @@ class FinanceModel {
     return result.rows[0] || null;
   }
 
-  /**
-   * Create a new expense
-   * @param {Object} expense - Expense data
-   * @returns {Promise<Object>} Created expense
-   */
   async create(expense) {
     const { cashbox_id, category, description, amount, user_id } = expense;
-    
+
     if (category && !VALID_CATEGORIES.includes(category)) {
       throw new Error(`Invalid category. Valid categories are: ${VALID_CATEGORIES.join(', ')}`);
     }
 
-    const result = await db.query(`
-      INSERT INTO expenses (cashbox_id, category, description, amount, user_id, created_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      RETURNING *
-    `, [cashbox_id, category, description, amount, user_id]);
-    
-    return result.rows[0];
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(`
+        INSERT INTO expenses (cashbox_id, category, description, amount, user_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING *
+      `, [cashbox_id, category, description, amount, user_id]);
+
+      const createdExpense = result.rows[0];
+
+      // Register cash flow entry so the cashbox tracks this expense
+      if (cashbox_id) {
+        const flowTypeResult = await client.query(
+          `SELECT id FROM cash_flow_types WHERE code = 'expense' LIMIT 1`
+        );
+        if (flowTypeResult.rows[0]) {
+          await client.query(`
+            INSERT INTO cash_flow (cashbox_id, flow_type_id, reference_table, reference_id, amount, created_at)
+            VALUES ($1, $2, 'expenses', $3, $4, NOW())
+          `, [cashbox_id, flowTypeResult.rows[0].id, createdExpense.id, -Math.abs(amount)]);
+        }
+      }
+
+      await client.query('COMMIT');
+      return createdExpense;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  /**
-   * Update an expense
-   * @param {number} id - Expense ID
-   * @param {Object} expense - Expense data to update
-   * @returns {Promise<Object>} Updated expense
-   */
   async update(id, expense) {
     const { category, description, amount } = expense;
     
@@ -140,24 +142,30 @@ class FinanceModel {
     return result.rows[0];
   }
 
-  /**
-   * Delete an expense (soft delete)
-   * @param {number} id - Expense ID
-   * @returns {Promise<boolean>} True if deleted
-   */
   async delete(id) {
-    const result = await db.query(
-      'UPDATE expenses SET deleted_at = NOW() WHERE id = $1',
-      [id]
-    );
-    return result.rowCount > 0;
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      // Soft delete the expense
+      const result = await client.query(
+        'UPDATE expenses SET deleted_at = NOW() WHERE id = $1',
+        [id]
+      );
+      // Reverse the cash_flow entry so the cashbox balance is corrected
+      await client.query(
+        `DELETE FROM cash_flow WHERE reference_table = 'expenses' AND reference_id = $1`,
+        [id]
+      );
+      await client.query('COMMIT');
+      return result.rowCount > 0;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  /**
-   * Get expenses summary by category
-   * @param {Object} filters - Filter options
-   * @returns {Promise<Object>} Expenses summary
-   */
   async getSummaryByCategory(filters = {}) {
     let dateFilter = '';
     const params = [];
@@ -198,11 +206,6 @@ class FinanceModel {
     };
   }
 
-  /**
-   * Get daily expenses (last 30 days by default)
-   * @param {Object} filters - Filter options
-   * @returns {Promise<Array>} Daily expenses
-   */
   async getDailyExpenses(filters = {}) {
     let dateFilter = '';
     const params = [];
@@ -240,10 +243,6 @@ class FinanceModel {
   // CAPITAL DE TRABAJO (WORKING CAPITAL)
   // ===========================================
 
-  /**
-   * Get inventory value (products * cost_price)
-   * @returns {Promise<number>} Total inventory value
-   */
   async getInventoryValue() {
     const result = await db.query(`
       SELECT COALESCE(SUM(stock_cached * cost_price), 0) as inventory_value
@@ -253,34 +252,22 @@ class FinanceModel {
     return parseFloat(result.rows[0].inventory_value) || 0;
   }
 
-  /**
-   * Parse date string to Date object correctly
-   * @param {string} dateStr - Date string in format YYYY-MM-DD
-   * @returns {Date} Parsed Date object
-   */
   parseDate(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
   }
 
-  /**
-   * Get waste value for a period
-   * @param {Object} filters - Filter options
-   * @returns {Promise<number>} Total waste value
-   */
   async getWasteValue(filters = {}) {
     let dateFilter = '';
     const params = [];
     let paramCount = 1;
 
     if (filters.start_date && filters.end_date) {
-      // start_date: usar > con el día siguiente para ser inclusivo
       dateFilter += ` AND sm.created_at > $${paramCount}`;
       const startDateObj = this.parseDate(filters.start_date);
       startDateObj.setDate(startDateObj.getDate() + 1);
       params.push(startDateObj.toISOString().split('T')[0]);
       paramCount++;
-      // end_date: usar < con el día siguiente para incluir todo el día final
       dateFilter += ` AND sm.created_at < $${paramCount}`;
       const endDateObj = this.parseDate(filters.end_date);
       endDateObj.setDate(endDateObj.getDate() + 1);
@@ -298,9 +285,8 @@ class FinanceModel {
   }
 
   /**
-   * Get cash in boxes (closed boxes in period)
-   * @param {Object} filters - Filter options
-   * @returns {Promise<number>} Total cash in boxes
+   * Get cash in boxes — includes both closed sessions (closing_amount)
+   * and currently open sessions (real-time balance from cash_flow)
    */
   async getCashInBoxes(filters = {}) {
     let dateFilter = '';
@@ -308,32 +294,46 @@ class FinanceModel {
     let paramCount = 1;
 
     if (filters.start_date) {
-      dateFilter += ` AND closed_at >= $${paramCount}`;
+      dateFilter += ` AND opened_at >= $${paramCount}`;
       params.push(filters.start_date);
       paramCount++;
     } else {
-      dateFilter += ` AND closed_at >= NOW() - INTERVAL '30 days'`;
+      dateFilter += ` AND opened_at >= NOW() - INTERVAL '30 days'`;
     }
 
     if (filters.end_date) {
-      dateFilter += ` AND closed_at <= $${paramCount}`;
+      dateFilter += ` AND opened_at <= $${paramCount}`;
       params.push(filters.end_date);
+      paramCount++;
     }
 
-    const result = await db.query(`
+    // Closed sessions: use the recorded closing_amount
+    const closedResult = await db.query(`
       SELECT COALESCE(SUM(closing_amount), 0) as total_cash
       FROM cashboxes
       WHERE status = 'closed'${dateFilter}
     `, params);
 
-    return parseFloat(result.rows[0].total_cash) || 0;
+    // Open sessions: calculate real-time balance from cash_flow
+    const openResult = await db.query(`
+      SELECT 
+        cb.id,
+        cb.opening_amount,
+        COALESCE(SUM(cf.amount), 0) as flow_total
+      FROM cashboxes cb
+      LEFT JOIN cash_flow cf ON cf.cashbox_id = cb.id
+      WHERE cb.status = 'open'${dateFilter}
+      GROUP BY cb.id, cb.opening_amount
+    `, params);
+
+    const closedTotal = parseFloat(closedResult.rows[0].total_cash) || 0;
+    const openTotal = openResult.rows.reduce((sum, row) => {
+      return sum + parseFloat(row.opening_amount) + parseFloat(row.flow_total);
+    }, 0);
+
+    return Math.round((closedTotal + openTotal) * 100) / 100;
   }
 
-  /**
-   * Get total expenses for a period
-   * @param {Object} filters - Filter options
-   * @returns {Promise<number>} Total expenses
-   */
   async getTotalExpenses(filters = {}) {
     let dateFilter = '';
     const params = [];
@@ -350,6 +350,7 @@ class FinanceModel {
     if (filters.end_date) {
       dateFilter += ` AND created_at <= $${paramCount}`;
       params.push(filters.end_date);
+      paramCount++;
     }
 
     const result = await db.query(`
@@ -361,11 +362,6 @@ class FinanceModel {
     return parseFloat(result.rows[0].total_expenses) || 0;
   }
 
-  /**
-   * Get complete working capital report
-   * @param {Object} filters - Filter options
-   * @returns {Promise<Object>} Working capital data
-   */
   async getWorkingCapital(filters = {}) {
     const [inventoryValue, wasteValue, cashInBoxes, totalExpenses] = await Promise.all([
       this.getInventoryValue(),
@@ -419,13 +415,8 @@ class FinanceModel {
     };
   }
 
-  /**
-   * Get or create capital configuration
-   * @returns {Promise<Object>} Capital configuration
-   */
   async getCapitalConfig() {
     const initialCapital = config.workingCapital.initialCapital;
-    
     return {
       initial_capital: initialCapital,
       has_initial_capital: initialCapital > 0,
@@ -433,11 +424,6 @@ class FinanceModel {
     };
   }
 
-  /**
-   * Update capital configuration
-   * @param {number} initialCapital - New initial capital value
-   * @returns {Promise<Object>} Updated config
-   */
   async updateCapitalConfig(initialCapital) {
     return {
       initial_capital: initialCapital,
