@@ -51,6 +51,7 @@ router.get('/payment-methods', authenticateToken, financeController.getValidPaym
 // ===========================================
 
 // GET /finances/working-capital - Get complete working capital report
+// @deprecated - Use GET /equity/current-capital instead
 router.get('/working-capital', authenticateToken, financeController.getWorkingCapital);
 
 // GET /finances/inventory-value - Get inventory value
@@ -66,6 +67,7 @@ router.get('/cash-in-boxes', authenticateToken, financeController.getCashInBoxes
 router.get('/capital-config', authenticateToken, authorizeRoles('admin'), financeController.getCapitalConfig);
 
 // PUT /finances/capital-config - Update capital configuration (admin only)
+// @deprecated - Use POST /equity/close instead
 router.put('/capital-config', authenticateToken, authorizeRoles('admin'), financeController.updateCapitalConfig);
 
 // ===========================================

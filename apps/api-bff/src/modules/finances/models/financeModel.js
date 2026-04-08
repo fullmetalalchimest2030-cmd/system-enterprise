@@ -370,7 +370,9 @@ class FinanceModel {
       this.getTotalExpenses(filters)
     ]);
 
-    const initialCapital = config.workingCapital.initialCapital;
+    const equityModel = require('../../equity/models/equityModel');
+    const storedCapital = await equityModel.getCurrentCapital();
+    const initialCapital = storedCapital !== null ? storedCapital : config.workingCapital.initialCapital;
     const netInventory = inventoryValue - wasteValue;
     const workingCapital = initialCapital + netInventory + cashInBoxes - totalExpenses;
 
@@ -402,6 +404,7 @@ class FinanceModel {
       },
       components: {
         initial_capital: initialCapital,
+        initial_capital_source: storedCapital !== null ? 'equity' : 'environment',
         inventory_gross: inventoryValue,
         waste_deductions: wasteValue,
         inventory_net: netInventory,
@@ -416,20 +419,22 @@ class FinanceModel {
   }
 
   async getCapitalConfig() {
-    const initialCapital = config.workingCapital.initialCapital;
+    const equityModel = require('../../equity/models/equityModel');
+    const storedCapital = await equityModel.getCurrentCapital();
+    const initialCapital = storedCapital !== null ? storedCapital : config.workingCapital.initialCapital;
     return {
       initial_capital: initialCapital,
       has_initial_capital: initialCapital > 0,
-      source: 'environment'
+      source: storedCapital !== null ? 'equity' : 'environment'
     };
   }
 
-  async updateCapitalConfig(initialCapital) {
-    return {
-      initial_capital: initialCapital,
-      message: 'Configure INITIAL_WORKING_CAPITAL in .env file',
-      requires_restart: true
-    };
+  /**
+   * @deprecated Este método no persiste ningún valor.
+   * El capital se gestiona mediante el módulo equity (POST /equity/close).
+   */
+  async updateCapitalConfig(_initialCapital) {
+    throw new Error('updateCapitalConfig está obsoleto. Usa POST /api/v1/equity/close para persistir el capital.');
   }
 }
 

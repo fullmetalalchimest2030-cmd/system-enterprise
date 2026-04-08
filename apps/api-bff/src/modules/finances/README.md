@@ -459,38 +459,11 @@ Obtiene la configuración del capital inicial.
 
 ---
 
-### PUT /finances/capital-config
+### ~~PUT /finances/capital-config~~ (OBSOLETO)
 
-Actualiza la configuración del capital inicial.
-
-**Autenticación:** Token JWT + Rol admin
-
-**Cuerpo de la solicitud:**
-
-```json
-{
-  "initial_capital": 15000.00
-}
-```
-
-**Validaciones:**
-- `initial_capital` (requerido): Debe ser un número positivo
-
-**Respuesta exitosa (200):**
-
-```json
-{
-  "success": true,
-  "message": "Capital config updated successfully",
-  "data": {
-    "initial_capital": 15000.00,
-    "message": "Configure INITIAL_WORKING_CAPITAL in .env file",
-    "requires_restart": true
-  }
-}
-```
-
-**Nota:** El capital inicial se configura mediante la variable de entorno `INITIAL_WORKING_CAPITAL` en el archivo `.env`.
+> **⚠️ Deprecated:** Este endpoint retorna `410 Gone`. El capital de trabajo ya no se configura manualmente mediante `.env`.
+>
+> El capital se persiste automáticamente al cerrar el período mensual con **`POST /api/v1/equity/close`**.
 
 ---
 

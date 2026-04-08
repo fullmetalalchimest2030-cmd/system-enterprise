@@ -388,3 +388,27 @@ GRANT ALL PRIVILEGES ON DATABASE floreria TO floreria_db;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO floreria_db;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO floreria_db;
 
+
+-- =============================================
+-- TABLA EQUITY (CAPITAL DE TRABAJO)
+-- =============================================
+
+CREATE TABLE equity (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    period_year smallint NOT NULL,
+    period_month smallint NOT NULL,
+    initial_capital numeric(14,2) NOT NULL,
+    inventory_net numeric(14,2) NOT NULL DEFAULT 0,
+    cash_in_boxes numeric(14,2) NOT NULL DEFAULT 0,
+    total_expenses numeric(14,2) NOT NULL DEFAULT 0,
+    final_capital numeric(14,2) NOT NULL,
+    notes text,
+    closed_by bigint REFERENCES users(id),
+    closed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT equity_period_unique UNIQUE (period_year, period_month),
+    CONSTRAINT equity_month_check CHECK (period_month BETWEEN 1 AND 12),
+    CONSTRAINT equity_year_check CHECK (period_year >= 2020)
+);
+
+CREATE INDEX idx_equity_period ON equity(period_year DESC, period_month DESC);
+CREATE INDEX idx_equity_closed_at ON equity(closed_at DESC);

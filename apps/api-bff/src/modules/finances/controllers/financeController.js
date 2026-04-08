@@ -138,10 +138,8 @@ class FinanceController {
   // ===========================================
 
   /**
+   * @deprecated Use GET /equity/current-capital or GET /equity/history for capital data.
    * Get complete working capital report
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   * @param {Function} next - Express next function
    */
   getWorkingCapital = asyncHandler(async (req, res, next) => {
     const filters = {
@@ -149,6 +147,8 @@ class FinanceController {
       end_date: req.query.end_date
     };
     
+    res.set('Deprecation', 'true');
+    res.set('Link', '</api/v1/equity/current-capital>; rel="successor-version"');
     const workingCapital = await financeService.getWorkingCapital(filters);
     res.json(successResponse(workingCapital, 'Working capital retrieved successfully'));
   });
@@ -208,20 +208,18 @@ class FinanceController {
   });
 
   /**
+   * @deprecated Use POST /equity/close to persist capital via the equity system.
    * Update capital configuration (initial capital)
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   * @param {Function} next - Express next function
    */
   updateCapitalConfig = asyncHandler(async (req, res, next) => {
-    const { initial_capital } = req.body;
-    
-    if (initial_capital === undefined) {
-      return res.status(400).json({ success: false, message: 'initial_capital is required' });
-    }
-    
-    const config = await financeService.updateCapitalConfig(parseFloat(initial_capital));
-    res.json(successResponse(config, 'Capital config updated successfully'));
+    res.set('Deprecation', 'true');
+    res.set('Link', '</api/v1/equity/close>; rel="successor-version"');
+    return res.status(410).json({
+      success: false,
+      deprecated: true,
+      message: 'Este endpoint está obsoleto. El capital de trabajo ahora se persiste automáticamente mediante POST /api/v1/equity/close al cerrar el período mensual.',
+      successor: 'POST /api/v1/equity/close',
+    });
   });
 }
 

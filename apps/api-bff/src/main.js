@@ -49,6 +49,9 @@ const alertRoutes = require('./modules/alerts/routes/alertRoutes');
 // Import routes - Audit
 const auditRoutes = require('./modules/audit/routes/auditRoutes');
 
+// Import routes - Equity
+const equityRoutes = require('./modules/equity/routes/equityRoutes');
+
 // Import routes - Public Catalog
 const catalogRoutes = require('./modules/catalog/catalogRoutes');
 
@@ -108,6 +111,7 @@ function createApp() {
   app.use('/api/v1/dashboard', dashboardRoutes);
   app.use('/api/v1/alerts', alertRoutes);
   app.use('/api/v1/audit', auditRoutes);
+  app.use('/api/v1/equity', equityRoutes);
 
   // Public routes (no authentication required)
   app.use('/api/v1/catalog', catalogRoutes);
