@@ -130,16 +130,36 @@ class FinanceModel {
   async update(id, expense) {
     const { category, description, amount } = expense;
     
-    const result = await db.query(`
-      UPDATE expenses 
-      SET category = COALESCE($1, category),
-          description = COALESCE($2, description),
-          amount = COALESCE($3, amount)
-      WHERE id = $4 AND deleted_at IS NULL
-      RETURNING *
-    `, [category, description, amount, id]);
-    
-    return result.rows[0];
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(`
+        UPDATE expenses 
+        SET category = COALESCE($1, category),
+            description = COALESCE($2, description),
+            amount = COALESCE($3, amount)
+        WHERE id = $4 AND deleted_at IS NULL
+        RETURNING *
+      `, [category, description, amount, id]);
+
+      // BUG-M03 fix: sync cash_flow when amount changes
+      if (amount !== undefined && result.rows[0]) {
+        await client.query(`
+          UPDATE cash_flow 
+          SET amount = $1
+          WHERE reference_table = 'expenses' AND reference_id = $2
+        `, [-Math.abs(amount), id]);
+      }
+
+      await client.query('COMMIT');
+      return result.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async delete(id) {
@@ -278,7 +298,8 @@ class FinanceModel {
       SELECT COALESCE(SUM(ABS(sm.quantity) * p.cost_price), 0) as waste_value
       FROM stock_movements sm
       JOIN products p ON sm.product_id = p.id
-      WHERE sm.movement_type_id = 3${dateFilter}
+      JOIN stock_movement_types smt ON sm.movement_type_id = smt.id
+      WHERE smt.code = 'waste'${dateFilter}
     `, params);
 
     return parseFloat(result.rows[0].waste_value) || 0;
@@ -343,8 +364,6 @@ class FinanceModel {
       dateFilter += ` AND created_at >= $${paramCount}`;
       params.push(filters.start_date);
       paramCount++;
-    } else {
-      dateFilter += ` AND created_at >= NOW() - INTERVAL '30 days'`;
     }
 
     if (filters.end_date) {

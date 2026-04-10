@@ -170,17 +170,30 @@ class DashboardModel {
   }
 
   /**
-   * Get bottom sellers
+   * Get bottom sellers — products with fewest sales in the last 30 days
    * @param {number} limit - Number of products to return
    * @returns {Promise<Array>} Bottom selling products
    */
   async getBottomSellers(limit = 5) {
     const result = await db.query(`
-      SELECT p.id, p.name, p.sku, p.stock_cached, p.sell_price, c.name as category_name
+      SELECT 
+        p.id,
+        p.name,
+        p.sku,
+        p.stock_cached,
+        p.sell_price,
+        c.name as category_name,
+        COALESCE(SUM(si.quantity), 0) as units_sold,
+        COALESCE(SUM(si.quantity * si.unit_price_at_sale), 0) as total_revenue
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN sale_items si ON p.id = si.product_id
+      LEFT JOIN sales s ON si.sale_id = s.id 
+        AND s.status = 'completed' 
+        AND s.created_at >= CURRENT_DATE - INTERVAL '30 days'
       WHERE p.deleted_at IS NULL
-      ORDER BY p.stock_cached DESC
+      GROUP BY p.id, p.name, p.sku, p.stock_cached, p.sell_price, c.name
+      ORDER BY units_sold ASC
       LIMIT $1
     `, [limit]);
 

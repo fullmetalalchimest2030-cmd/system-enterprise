@@ -240,6 +240,38 @@ class SalesModel {
               [item.quantity, item.product_id]
             );
           }
+        } else if (item.recipe_id) {
+          // Restore stock for each ingredient in the recipe (BUG-M09 fix)
+          const ingredientsResult = await client.query(
+            `SELECT product_id, quantity FROM recipe_items WHERE recipe_id = $1 AND deleted_at IS NULL`,
+            [item.recipe_id]
+          );
+          for (const ing of ingredientsResult.rows) {
+            const totalQuantity = ing.quantity * item.quantity;
+            await client.query(`
+              INSERT INTO stock_movements (product_id, movement_type_id, quantity, unit_cost, reference_table, reference_id, user_id, notes, created_at)
+              VALUES ($1, $2, $3, $4, 'sales', $5, $6, $7, NOW())
+            `, [
+              ing.product_id,
+              returnMovementTypeId,
+              totalQuantity,
+              item.unit_cost_at_sale || 0,
+              saleId,
+              userId,
+              'Stock restored from cancelled sale (recipe ingredient)'
+            ]);
+            try {
+              await client.query(
+                'UPDATE products SET stock_cached = stock_cached + $1, updated_at = NOW() WHERE id = $2',
+                [totalQuantity, ing.product_id]
+              );
+            } catch (updateError) {
+              await client.query(
+                'UPDATE products SET stock_cached = stock_cached + $1 WHERE id = $2',
+                [totalQuantity, ing.product_id]
+              );
+            }
+          }
         }
       }
 
@@ -381,15 +413,15 @@ class SalesModel {
 
           // Add sale items
       if (items && items.length > 0) {
-        for (const item of items) {
+        // Get movement type ID for 'sale' once, outside the loop
+      const movementTypeResult = await client.query(`SELECT id FROM stock_movement_types WHERE code = 'sale'`);
+      const movementTypeId = movementTypeResult.rows[0].id;
+
+      for (const item of items) {
           await client.query(`
             INSERT INTO sale_items (sale_id, product_id, recipe_id, item_name_snapshot, quantity, unit_price_at_sale, unit_cost_at_sale, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
           `, [sale.id, item.product_id || null, item.recipe_id || null, item.name, item.quantity, item.price, item.cost || 0]);
-
-          // Get movement type ID for 'sale'
-          const movementTypeResult = await client.query(`SELECT id FROM stock_movement_types WHERE code = 'sale'`);
-          const movementTypeId = movementTypeResult.rows[0].id;
 
           if (item.product_id) {
             await client.query(`
