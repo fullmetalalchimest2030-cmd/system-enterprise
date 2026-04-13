@@ -145,7 +145,7 @@ class ProductService {
       throw new AppError('Product not found', 404);
     }
 
-    return await productModel.softDelete(id);
+    return await productModel.delete(id);
   }
 
   /**
