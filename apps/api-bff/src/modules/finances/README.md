@@ -1,12 +1,13 @@
 # Módulo de Finanzas (Finances Module)
 
-API para la gestión de gastos y cálculo del Capital de Trabajo.
+API para la gestión de gastos operativos del negocio.
+
+> El capital de trabajo y los cierres mensuales se gestionan en el módulo **Equity** (`/api/v1/equity`).
 
 ## Tabla de Contenidos
 
 - [Gastos (Expenses)](#gastos-expenses)
 - [Capital de Trabajo (Working Capital)](#capital-de-trabajo-working-capital)
-- [Configuración](#configuración)
 
 ---
 
@@ -293,63 +294,10 @@ Obtiene los métodos de pago válidos.
 
 ## Capital de Trabajo (Working Capital)
 
-### GET /finances/working-capital
+> El capital de trabajo se gestiona en el módulo **Equity** (`/api/v1/equity`).
+> Ver documentación en `docs/10-equity.md` y `docs/money-model.md`.
 
-Obtiene el reporte completo del Capital de Trabajo.
-
-**Autenticación:** Token JWT requerido
-
-**Parámetros de Query:**
-
-| Parámetro | Tipo | Descripción |
-|-----------|------|-------------|
-| `start_date` | string | Fecha inicio del período (ISO 8601) |
-| `end_date` | string | Fecha fin del período (ISO 8601) |
-
-**Por defecto:** Últimos 30 días
-
-**Fórmula de cálculo:**
-
-```
-Capital de Trabajo = (Inventario - Mermas) + Efectivo en Cajas - Gastos
-```
-
-**Respuesta exitosa (200):**
-
-```json
-{
-  "success": true,
-  "message": "Working capital retrieved successfully",
-  "data": {
-    "period": {
-      "start_date": "2026-02-23T00:00:00Z",
-      "end_date": "2026-03-25T00:00:00Z"
-    },
-    "components": {
-      "inventory_gross": 15000.00,
-      "waste_deductions": 500.00,
-      "inventory_net": 14500.00,
-      "cash_in_boxes": 3200.00,
-      "total_expenses": 2800.00
-    },
-    "working_capital": 14900.00,
-    "status": "solid",
-    "status_label": "Sólido",
-    "status_color": "green"
-  }
-}
-```
-
-**Estados posibles:**
-
-| Estado | Condición | Color |
-|--------|-----------|-------|
-| `solid` | Capital > 100% de gastos | verde |
-| `warning` | Capital 30%-100% de gastos | amarillo |
-| `low` | Capital < 30% de gastos | naranja |
-| `critical` | Capital ≤ 0 | rojo |
-
----
+Los siguientes endpoints de este módulo siguen disponibles como datos de componentes:
 
 ### GET /finances/inventory-value
 
@@ -386,10 +334,6 @@ Obtiene el valor de las mermas en un período.
 | `start_date` | string | Fecha inicio (ISO 8601) |
 | `end_date` | string | Fecha fin (ISO 8601) |
 
-**Por defecto:** Últimos 30 días
-
-**Cálculo:** `SUM(ABS(quantity) * cost_price)` de movimientos tipo `waste`
-
 **Respuesta exitosa (200):**
 
 ```json
@@ -406,7 +350,7 @@ Obtiene el valor de las mermas en un período.
 
 ### GET /finances/cash-in-boxes
 
-Obtiene el efectivo en cajas cerradas.
+Obtiene el efectivo en cajas del período.
 
 **Autenticación:** Token JWT requerido
 
@@ -416,10 +360,6 @@ Obtiene el efectivo en cajas cerradas.
 |-----------|------|-------------|
 | `start_date` | string | Fecha inicio (ISO 8601) |
 | `end_date` | string | Fecha fin (ISO 8601) |
-
-**Por defecto:** Últimos 30 días
-
-**Cálculo:** `SUM(closing_amount)` de cajas con estado `closed`
 
 **Respuesta exitosa (200):**
 
@@ -435,35 +375,13 @@ Obtiene el efectivo en cajas cerradas.
 
 ---
 
-## Configuración
+## Endpoints eliminados
 
-### GET /finances/capital-config
-
-Obtiene la configuración del capital inicial.
-
-**Autenticación:** Token JWT + Rol admin
-
-**Respuesta exitosa (200):**
-
-```json
-{
-  "success": true,
-  "message": "Capital config retrieved successfully",
-  "data": {
-    "initial_capital": 10000.00,
-    "has_initial_capital": true,
-    "source": "environment"
-  }
-}
-```
-
----
-
-### ~~PUT /finances/capital-config~~ (OBSOLETO)
-
-> **⚠️ Deprecated:** Este endpoint retorna `410 Gone`. El capital de trabajo ya no se configura manualmente mediante `.env`.
->
-> El capital se persiste automáticamente al cerrar el período mensual con **`POST /api/v1/equity/close`**.
+| Endpoint | Reemplazar con |
+|----------|----------------|
+| `GET /finances/working-capital` | `GET /equity/current-capital` |
+| `GET /finances/capital-config` | `GET /equity/current-capital` |
+| `PUT /finances/capital-config` | `POST /equity/close` |
 
 ---
 

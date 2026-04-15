@@ -21,14 +21,8 @@ const { financeSchemas } = require('../../../shared/validation/schemas');
  * - GET /finances/daily - Get daily expenses
  * - GET /finances/categories - Get valid categories
  * - GET /finances/payment-methods - Get valid payment methods
- * 
- * Working Capital routes:
- * - GET /finances/working-capital - Get complete working capital report
- * - GET /finances/inventory-value - Get inventory value
- * - GET /finances/waste-value - Get waste value
- * - GET /finances/cash-in-boxes - Get cash in boxes
- * - GET /finances/capital-config - Get capital configuration (admin)
- * - PUT /finances/capital-config - Update capital configuration (admin)
+ *
+ * Capital de trabajo → ver módulo equity (/api/v1/equity)
  */
 
 // GET /finances - Get all expenses
@@ -45,30 +39,6 @@ router.get('/categories', authenticateToken, financeController.getValidCategorie
 
 // GET /finances/payment-methods - Get valid payment methods
 router.get('/payment-methods', authenticateToken, financeController.getValidPaymentMethods);
-
-// ===========================================
-// CAPITAL DE TRABAJO (WORKING CAPITAL)
-// ===========================================
-
-// GET /finances/working-capital - Get complete working capital report
-// @deprecated - Use GET /equity/current-capital instead
-router.get('/working-capital', authenticateToken, financeController.getWorkingCapital);
-
-// GET /finances/inventory-value - Get inventory value
-router.get('/inventory-value', authenticateToken, financeController.getInventoryValue);
-
-// GET /finances/waste-value - Get waste value for period
-router.get('/waste-value', authenticateToken, financeController.getWasteValue);
-
-// GET /finances/cash-in-boxes - Get cash in boxes for period
-router.get('/cash-in-boxes', authenticateToken, financeController.getCashInBoxes);
-
-// GET /finances/capital-config - Get capital configuration (admin only)
-router.get('/capital-config', authenticateToken, authorizeRoles('admin'), financeController.getCapitalConfig);
-
-// PUT /finances/capital-config - Update capital configuration (admin only)
-// @deprecated - Use POST /equity/close instead
-router.put('/capital-config', authenticateToken, authorizeRoles('admin'), financeController.updateCapitalConfig);
 
 // ===========================================
 // EXPENSE CRUD
